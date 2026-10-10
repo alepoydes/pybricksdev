@@ -53,6 +53,8 @@ class PybricksUsbInEpMessageType(IntEnum):
     """
     Analogous to BLE status response.
     """
+    READ_REPLY = 3
+    """CDC characteristic reply: service, uint16 id, value."""
     EVENT = 2
     """
     Analogous to BLE notification.
@@ -64,6 +66,8 @@ class PybricksUsbOutEpMessageType(IntEnum):
     """
     Analogous to BLE Client Characteristic Configuration Descriptor (CCCD).
     """
+    READ = 3
+    """CDC characteristic read: service, uint16 id."""
     COMMAND = 2
     """
     Analogous to BLE write without response.

@@ -261,6 +261,12 @@ class StatusFlag(IntFlag):
     .. availability:: Since Pybricks protocol v1.4.0.
     """
 
+    USB_HOST_CONNECTED = 1 << 12
+    """A computer owns the USB management session.
+
+    .. availability:: Since Pybricks protocol v1.6.0.
+    """
+
 
 class HubCapabilityFlag(IntFlag):
     """

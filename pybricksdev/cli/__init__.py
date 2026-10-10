@@ -133,6 +133,26 @@ class Compile(Tool):
         print_mpy(mpy)
 
 
+class USBInfo(Tool):
+    def add_parser(self, subparsers):
+        parser = subparsers.add_parser("usb-info", help="identify a CDC Pybricks hub")
+        parser.tool = self
+        parser.add_argument("port", help="CDC serial port, e.g. /dev/ttyACM0 or COM3")
+
+    async def run(self, args):
+        from pybricksdev.connections.serial import PybricksHubSerial
+
+        hub = PybricksHubSerial(args.port)
+        try:
+            await hub.connect()
+            print(f"Name: {hub.name}")
+            print(f"Firmware: {hub.fw_version}")
+            print(f"Protocol: {hub.protocol_version}")
+            print(f"Hub: 0x{hub.hub_kind:02x}; variant: {hub.hub_variant}")
+        finally:
+            await hub.disconnect()
+
+
 class Run(Tool):
     def add_parser(self, subparsers: argparse._SubParsersAction):
         parser = subparsers.add_parser(
@@ -162,6 +182,9 @@ class Run(Tool):
         )
 
         parser.add_argument(
+            "--port", help="CDC serial port (USB Profile 1.6+); requires usb"
+        )
+        parser.add_argument(
             "--start",
             help="Start the program immediately after downloading it.",
             action=argparse.BooleanOptionalAction,
@@ -184,6 +207,8 @@ class Run(Tool):
 
     async def run(self, args: argparse.Namespace):
 
+        if getattr(args, "port", None) and args.conntype != "usb":
+            raise ValueError("--port requires a USB connection")
         # Pick the right connection
         if args.conntype == "ble":
             from pybricksdev.ble import find_device as find_ble
@@ -193,6 +218,10 @@ class Run(Tool):
             print(f"Searching for {args.name or 'any hub with Pybricks service'}...")
             device_or_address = await find_ble(args.name)
             hub = PybricksHubBLE(device_or_address)
+        elif args.conntype == "usb" and getattr(args, "port", None):
+            from pybricksdev.connections.serial import PybricksHubSerial
+
+            hub = PybricksHubSerial(args.port)
         elif args.conntype == "usb":
             from usb.core import find as find_usb
 
@@ -268,6 +297,8 @@ class Run(Tool):
                     )
                     device_or_address = await find_ble(args.name)
                     hub = PybricksHubBLE(device_or_address)
+                elif args.conntype == "usb" and getattr(args, "port", None):
+                    hub = PybricksHubSerial(args.port)
                 elif args.conntype == "usb":
                     device_or_address = find_usb(custom_match=is_pybricks_usb)
                     hub = PybricksHubUSB(device_or_address)
@@ -603,7 +634,7 @@ def main():
         help="the tool to use",
     )
 
-    for tool in Compile(), Run(), Flash(), DFU(), OAD(), LWP3(), Udev():
+    for tool in Compile(), Run(), USBInfo(), Flash(), DFU(), OAD(), LWP3(), Udev():
         tool.add_parser(subparsers)
 
     argcomplete.autocomplete(parser)

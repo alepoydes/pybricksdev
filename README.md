@@ -133,6 +133,25 @@ firmware.
     # Run script on any Pybricks device
     pipx run pybricksdev run usb demo/shortdemo.py
 
+For the CDC serial interface in Pybricks Profile 1.6+, select the port explicitly:
+
+    pybricksdev usb-info /dev/ttyACM0
+    pybricksdev run usb --port /dev/ttyACM0 demo/shortdemo.py
+
+Use the port listed by `python -m serial.tools.list_ports -v` (`COM3`, for
+example, on Windows). Close other clients before connecting. `usb-info` reads
+identity without uploading or starting a program. Omitting `--port` retains the
+older vendor-specific USB transport; the client does not guess protocols from
+incoming data. This CDC implementation has PTY simulation coverage; physical
+hub and Windows/macOS validation remain outstanding.
+
+The library entry point is `pybricksdev.connections.serial.PybricksHubSerial`.
+It reuses `PybricksHub` operations and status/stdout observables. Exchanges have a
+configurable timeout, command replies match their correlation tag, and a lost
+reply or cancellation closes the session before another request can reuse it.
+`disconnect()` releases the port, including after a failed connection. It does
+not stop an autonomous program.
+
 ### Compiling Pybricks MicroPython programs without running
 
 This can be used to compile programs. Instead of also running them as above,

@@ -4,7 +4,7 @@ import asyncio
 import contextlib
 import os
 import tempfile
-from unittest.mock import AsyncMock, PropertyMock, patch
+from unittest.mock import AsyncMock, patch
 
 import pytest
 from reactivex.subject import Subject
@@ -29,9 +29,7 @@ class TestPybricksHub:
         hub._client = AsyncMock()
         hub.get_capabilities = AsyncMock(return_value={"pybricks": {"mpy": True}})
         hub.download_user_program = AsyncMock()
-        type(hub.connection_state_observable).value = PropertyMock(
-            return_value=ConnectionState.CONNECTED
-        )
+        hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
         hub._capability_flags = HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6
 
         with contextlib.ExitStack() as stack:
@@ -56,9 +54,7 @@ class TestPybricksHub:
         hub._client = AsyncMock()
         hub.download_user_program = AsyncMock()
         hub.hub_kind = HubKind.BOOST
-        type(hub.connection_state_observable).value = PropertyMock(
-            return_value=ConnectionState.CONNECTED
-        )
+        hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
         hub._capability_flags = HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6
 
         with contextlib.ExitStack() as stack:
@@ -82,9 +78,7 @@ class TestPybricksHub:
         hub._mpy_abi_version = 6
         hub._client = AsyncMock()
         hub.get_capabilities = AsyncMock(return_value={"pybricks": {"mpy": False}})
-        type(hub.connection_state_observable).value = PropertyMock(
-            return_value=ConnectionState.CONNECTED
-        )
+        hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
         hub._capability_flags = 0
 
         with contextlib.ExitStack() as stack:
@@ -111,9 +105,7 @@ class TestPybricksHub:
         hub._mpy_abi_version = 6
         hub._client = AsyncMock()
         hub.get_capabilities = AsyncMock(return_value={"pybricks": {"mpy": True}})
-        type(hub.connection_state_observable).value = PropertyMock(
-            return_value=ConnectionState.CONNECTED
-        )
+        hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
         hub._capability_flags = HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6
         hub._max_user_program_size = 1000  # Set a reasonable size limit
 
@@ -150,9 +142,7 @@ class TestPybricksHub:
         hub.download_user_program = AsyncMock()
         hub.start_user_program = AsyncMock()
         hub.write_gatt_char = AsyncMock()
-        type(hub.connection_state_observable).value = PropertyMock(
-            return_value=ConnectionState.CONNECTED
-        )
+        hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
         hub._capability_flags = HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6
         hub.hub_kind = HubKind.BOOST
 

@@ -53,3 +53,15 @@ file in the project when you select the interpreter.
 For instance, if you want the installed `pybricksdev` to use code from the `develop` branch of the `bleak` package.
 
     pipx inject pybricksdev https://github.com/hbldh/bleak/archive/refs/heads/develop.zip
+
+### Locked uv environment
+
+The CDC topic also provides a uv lock for local checks:
+
+```sh
+uv sync --locked
+uv run --locked pytest -q
+```
+
+The serial checks use POSIX pseudoterminals. They exercise real pySerial/asyncio
+I/O with a synthetic protocol peer; they are not physical USB measurements.
