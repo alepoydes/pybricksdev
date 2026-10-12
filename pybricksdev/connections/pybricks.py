@@ -558,6 +558,7 @@ class PybricksHub:
             & (
                 HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6
                 | HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6_1_NATIVE
+                | HubCapabilityFlag.USER_PROG_FORMAT_MULTI_MPY_V6_3_NATIVE
             )
         ):
             raise RuntimeError(
@@ -573,8 +574,18 @@ class PybricksHub:
         ):
             abi = (6, 1)
 
+        compile_args = None
+        if (
+            self._capability_flags
+            & HubCapabilityFlag.USER_PROG_FORMAT_MULTI_MPY_V6_3_NATIVE
+        ):
+            abi = (6, 3)
+            # Both Prime/Inventor MCU variants accept Thumb-2 without FPU instructions.
+            if self.hub_kind == HubKind.TECHNIC_LARGE:
+                compile_args = ["-march=armv7m"]
+
         # Compile the script to mpy format
-        mpy = await compile_multi_file(script_path, abi)
+        mpy = await compile_multi_file(script_path, abi, compile_args)
         # Download without running
         await self.download_user_program(mpy)
 

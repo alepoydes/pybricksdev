@@ -400,6 +400,23 @@ wheels = [
 ]
 
 [[package]]
+name = "mpy-cross-v6-3"
+version = "1.1.1"
+source = { registry = "https://pypi.org/simple" }
+sdist = { url = "https://files.pythonhosted.org/packages/68/4c/53df32445c7c4d9c4a3aedb693c77b8b1c006c2dfed5b95c4beea608fe8b/mpy_cross_v6_3-1.1.1.tar.gz", hash = "sha256:55414c358f5844c784e76d3b253cbd7af5f243ddd4c0b47a26d3875d628df300", size = 668271, upload-time = "2025-08-10T21:39:07.14Z" }
+wheels = [
+    { url = "https://files.pythonhosted.org/packages/88/e1/5c01674640bd11b548ad1265a0ac0980c213ad9b6c5e4de7e8fe38771a68/mpy_cross_v6_3-1.1.1-py3-none-macosx_10_13_x86_64.whl", hash = "sha256:d8a3ace9d73e4e4cf173f8e3d41df12fc5fb6663d64d16365f19e1714dc9b698", size = 146302, upload-time = "2025-08-10T21:38:55.017Z" },
+    { url = "https://files.pythonhosted.org/packages/14/a5/e8b079606434701c4b6e305a213af4af55b0b390b0a4f63fde661e49e740/mpy_cross_v6_3-1.1.1-py3-none-macosx_11_0_arm64.whl", hash = "sha256:0d660d6d3a0bb6e20ff8963375a710838116278acb76ea31442205f5ee4eb11e", size = 145146, upload-time = "2025-08-10T21:38:56.578Z" },
+    { url = "https://files.pythonhosted.org/packages/31/8b/4fc03d7ae50501c1fd0f2faa6c1c9acbf5c25063a55ac49b57995e6aa888/mpy_cross_v6_3-1.1.1-py3-none-manylinux2014_aarch64.manylinux_2_17_aarch64.manylinux_2_28_aarch64.whl", hash = "sha256:660c1d60591303293a52ae7ebd663d9f475bdac88997637aee471e9bd7be7b92", size = 155185, upload-time = "2025-08-10T21:38:57.87Z" },
+    { url = "https://files.pythonhosted.org/packages/c2/fa/48ab898e6c6a6bab401407558ff37c1f61c8ed99b70d4817bf400ff8fd2b/mpy_cross_v6_3-1.1.1-py3-none-manylinux2014_x86_64.manylinux_2_17_x86_64.manylinux_2_28_x86_64.whl", hash = "sha256:d69d51462b9f089644f98f40aa7a3755cd49da2d30c69617776b94d92758a245", size = 131366, upload-time = "2025-08-10T21:38:59.095Z" },
+    { url = "https://files.pythonhosted.org/packages/57/04/a7c09d29d62ed98be0236179ac3a913fa203ae26fd3650b384d0aaf44439/mpy_cross_v6_3-1.1.1-py3-none-musllinux_1_2_aarch64.whl", hash = "sha256:0c0830dd6204227b9c49234b20f0144eba4cc4fa3c88d026b52041530d770f7c", size = 169481, upload-time = "2025-08-10T21:39:00.147Z" },
+    { url = "https://files.pythonhosted.org/packages/57/1f/dd2a62a18956a40bc784b43adad70b7c317d8137dc02cc6702edf2f4afb6/mpy_cross_v6_3-1.1.1-py3-none-musllinux_1_2_x86_64.whl", hash = "sha256:202b51d1eadff18670c92a1262883a3582325e9b2ab80d8d96d68f731d58df0d", size = 146935, upload-time = "2025-08-10T21:39:01.609Z" },
+    { url = "https://files.pythonhosted.org/packages/87/47/6caf2e83c6e056095112950945fa23c405031051eb8c9779ee0c9da3d311/mpy_cross_v6_3-1.1.1-py3-none-win32.whl", hash = "sha256:dae4cb74c9568ace07ab30e63e8a24c48fa6583dcc9c199bd0d6722bc4c89fef", size = 146929, upload-time = "2025-08-10T21:39:02.968Z" },
+    { url = "https://files.pythonhosted.org/packages/22/6f/3ccd4f3938e92968361d75bab307b898a1f2662adb2fb645aada72b34d2d/mpy_cross_v6_3-1.1.1-py3-none-win_amd64.whl", hash = "sha256:156dd26ff819b54ca920bd36074606e489b7f8fe41fef8556659017dc6cafc30", size = 149934, upload-time = "2025-08-10T21:39:04.351Z" },
+    { url = "https://files.pythonhosted.org/packages/81/5b/57ba4ca29724a37850815ad98527c7d40fa95fe8493e708b96e7f16b1271/mpy_cross_v6_3-1.1.1-py3-none-win_arm64.whl", hash = "sha256:3d62f9b33d1346028be086906be9c918be6d09684b6335f02852d513052b9c80", size = 149933, upload-time = "2025-08-10T21:39:06.099Z" },
+]
+
+[[package]]
 name = "mypy-extensions"
 version = "1.1.0"
 source = { registry = "https://pypi.org/simple" }
@@ -476,6 +493,7 @@ dependencies = [
     { name = "hidapi" },
     { name = "mpy-cross-v5" },
     { name = "mpy-cross-v6" },
+    { name = "mpy-cross-v6-3" },
     { name = "packaging" },
     { name = "prompt-toolkit" },
     { name = "pybricks", marker = "python_full_version < '4'" },
@@ -504,6 +522,7 @@ requires-dist = [
     { name = "hidapi", specifier = ">=0.14.0" },
     { name = "mpy-cross-v5", specifier = ">=1.1.2" },
     { name = "mpy-cross-v6", specifier = ">=1.1.2" },
+    { name = "mpy-cross-v6-3", specifier = ">=1.1.1" },
     { name = "packaging", specifier = ">=22" },
     { name = "prompt-toolkit", specifier = ">=3.0.18" },
     { name = "pybricks", marker = "python_full_version < '4'", specifier = ">=3" },

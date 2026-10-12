@@ -12,6 +12,7 @@ from tempfile import TemporaryDirectory
 
 import mpy_cross_v5
 import mpy_cross_v6
+import mpy_cross_v6_3
 
 from pybricksdev.tools import chunk
 
@@ -33,7 +34,10 @@ def make_build_dir() -> None:
 
 
 async def compile_file(
-    proj_dir: str, proj_path: str, abi: int, compile_args: list[str] | None = None
+    proj_dir: str,
+    proj_path: str,
+    abi: int | tuple[int, int],
+    compile_args: list[str] | None = None,
 ) -> bytes:
     """Compiles a Python file with ``mpy-cross``.
 
@@ -44,7 +48,7 @@ async def compile_file(
             Path to script that is to be compiled relative to proj_dir. This is
             the portion of the name that is passed to ``mpy-cross``.
         abi:
-            Expected MPY ABI version.
+            Expected MPY ABI version; (6, 3) selects the native-v6.3 compiler.
         compile_args:
             Extra arguments for ``mpy-cross``.
 
@@ -53,7 +57,7 @@ async def compile_file(
 
     Raises:
         RuntimeError: if there is not a running event loop.
-        ValueError if MPY ABI version is not 5 or 6.
+        ValueError: if MPY ABI is not 5, 6 or (6, 3).
         subprocess.CalledProcessError: if executing the ``mpy-cross` tool failed.
     """
 
@@ -69,15 +73,16 @@ async def compile_file(
                     proj_path, script, no_unicode=True, extra_args=compile_args
                 ),
             )
-        elif abi == 6:
+        elif abi in (6, (6, 3)):
+            compiler = mpy_cross_v6_3 if abi == (6, 3) else mpy_cross_v6
             proc, mpy = await loop.run_in_executor(
                 None,
-                lambda: mpy_cross_v6.mpy_cross_compile(
+                lambda: compiler.mpy_cross_compile(
                     proj_path, script, extra_args=compile_args
                 ),
             )
         else:
-            raise ValueError("mpy_version must be 5 or 6")
+            raise ValueError("mpy_version must be 5 or 6; use (6, 3) for native v6.3")
 
         proc.check_returncode()
 
@@ -86,7 +91,9 @@ async def compile_file(
         return mpy
 
 
-async def compile_multi_file(path: str, abi: int | tuple[int, int]) -> bytes:
+async def compile_multi_file(
+    path: str, abi: int | tuple[int, int], compile_args: list[str] | None = None
+) -> bytes:
     """Compiles a Python file and its dependencies with ``mpy-cross``.
 
     On the hub, all dependencies behave as independent modules. Any (leading)
@@ -113,6 +120,9 @@ async def compile_multi_file(path: str, abi: int | tuple[int, int]) -> bytes:
         abi:
             Expected MPY ABI version. Can be major version (int) if no native
             .mpy modules or tuple of major, minor version.
+        compile_args:
+            Extra compiler arguments, including the target architecture for
+            native/Viper decorators. Precompiled modules are not recompiled.
 
     Returns:
         Concatenation of all compiled files in the format given above.
@@ -124,9 +134,9 @@ async def compile_multi_file(path: str, abi: int | tuple[int, int]) -> bytes:
     """
 
     if isinstance(abi, int) and abi < 6 or isinstance(abi, tuple) and abi < (6, 0):
-        return await _compile_multi_file_with_module_finder(path, abi)
+        return await _compile_multi_file_with_module_finder(path, abi, compile_args)
 
-    return await _compile_multi_file_with_mpy_tool(path, abi)
+    return await _compile_multi_file_with_mpy_tool(path, abi, compile_args)
 
 
 def _run_mpy_tool(mpy_path: str) -> bytes:
@@ -158,42 +168,56 @@ def _run_mpy_tool(mpy_path: str) -> bytes:
     return stdout
 
 
-async def _compile_module_and_get_imports(
-    proj_dir: str, module_name: str, abi: int
-) -> tuple[bytes, set[str]]:
-    """
-    Compiles a single file with mpy-cross and then dissembles it with mpy-tool
-    to get the list of imported modules.
-
-    Args:
-        proj_dir:
-            Path to project containing the script to be compiled.
-        module_name:
-            Module name to be compiled.
-        abi:
-            Expected MPY ABI major version.
-
-    Returns:
-        A tuple of the compiled MPY bytes and a set of imported module names.
-
-    The module is searched relative to *proj_dir*.
-    """
-    with TemporaryDirectory() as temp_dir:
-        module_path = os.path.join(*module_name.split(".")) + ".py"
-        package_path = os.path.join(*module_name.split("."), "__init__.py")
-
-        # TODO: check for pre-compiled .mpy file first?
-
-        if os.path.exists(os.path.join(proj_dir, module_path)):
-            src_path = module_path
-        elif os.path.exists(os.path.join(proj_dir, package_path)):
-            src_path = package_path
-        else:
-            raise FileNotFoundError(
-                f"Module {module_name} not found. Searched for {module_path} and {package_path}."
+def _check_mpy(mpy: bytes, path: str, abi: int | tuple[int, int]) -> None:
+    major, minor = (abi, None) if isinstance(abi, int) else abi
+    if len(mpy) < 4 or mpy[0] != ord("M"):
+        raise ValueError(f"{path} has an invalid .mpy header")
+    if mpy[1] != major:
+        raise ValueError(
+            f"{path} has abi major version {mpy[1]} while {major} is required"
+        )
+    if mpy[2] >> 2:
+        if minor is None:
+            raise ValueError(
+                f"{path} contains native code but the hub has no native ABI"
+            )
+        if mpy[2] & 3 != minor:
+            raise ValueError(
+                f"{path} has abi minor version {mpy[2] & 3} while {minor} is required"
             )
 
-        mpy = await compile_file(proj_dir, src_path, abi)
+
+async def _compile_module_and_get_imports(
+    proj_dir: str,
+    module_name: str,
+    abi: int | tuple[int, int],
+    compile_args: list[str] | None,
+) -> tuple[bytes, set[str]]:
+    """Read or compile a module, then use mpy-tool to find its imports."""
+    with TemporaryDirectory() as temp_dir:
+        stem = os.path.join(*module_name.split("."))
+        candidates = (
+            stem + ".py",
+            stem + ".mpy",
+            os.path.join(stem, "__init__.py"),
+            os.path.join(stem, "__init__.mpy"),
+        )
+        for src_path in candidates:
+            full_path = os.path.join(proj_dir, src_path)
+            if not os.path.isfile(full_path):
+                continue
+            if src_path.endswith(".py"):
+                # Older clients used the v6 bytecode compiler; only native v6.3
+                # selects a different producer here.
+                compiler_abi = abi if isinstance(abi, int) or abi == (6, 3) else abi[0]
+                mpy = await compile_file(proj_dir, src_path, compiler_abi, compile_args)
+            else:
+                with open(full_path, "rb") as f:
+                    mpy = f.read()
+            break
+        else:
+            raise FileNotFoundError(f"Module {module_name} not found in {proj_dir}")
+        _check_mpy(mpy, src_path, abi)
 
         mpy_path = os.path.join(temp_dir, TMP_MPY_SCRIPT)
 
@@ -221,7 +245,7 @@ async def _compile_module_and_get_imports(
 
 
 async def _compile_multi_file_with_mpy_tool(
-    path: str, abi: int | tuple[int, int]
+    path: str, abi: int | tuple[int, int], compile_args: list[str] | None
 ) -> bytes:
     """
     Implementation of compile_multi_file() using mpy-tool to find imports.
@@ -230,10 +254,8 @@ async def _compile_multi_file_with_mpy_tool(
     proj_module_file = os.path.basename(path)
     proj_module_name = os.path.splitext(proj_module_file)[0]
 
-    abi_major, _abi_minor = (abi, None) if isinstance(abi, int) else abi
-
     mpy, imported_modules = await _compile_module_and_get_imports(
-        proj_dir, proj_module_name, abi_major
+        proj_dir, proj_module_name, abi, compile_args
     )
 
     not_found_modules = set[str]()
@@ -245,7 +267,7 @@ async def _compile_multi_file_with_mpy_tool(
         for module_name in to_compile:
             try:
                 mpy, new_imports = await _compile_module_and_get_imports(
-                    proj_dir, module_name, abi_major
+                    proj_dir, module_name, abi, compile_args
                 )
             except FileNotFoundError:
                 not_found_modules.add(module_name)
@@ -265,7 +287,7 @@ async def _compile_multi_file_with_mpy_tool(
 
 
 async def _compile_multi_file_with_module_finder(
-    path: str, abi: int | tuple[int, int]
+    path: str, abi: int | tuple[int, int], compile_args: list[str] | None
 ) -> bytes:
     """
     Legacy implementation of compile_multi_file() using CPython's ModuleFinder.
@@ -300,7 +322,10 @@ async def _compile_multi_file_with_module_finder(
             continue
 
         mpy = await compile_file(
-            proj_path, os.path.relpath(module.__file__, proj_path), abi_major
+            proj_path,
+            os.path.relpath(module.__file__, proj_path),
+            abi_major,
+            compile_args,
         )
 
         parts.append(len(mpy).to_bytes(4, "little"))

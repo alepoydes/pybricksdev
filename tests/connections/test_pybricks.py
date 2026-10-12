@@ -180,3 +180,28 @@ class TestPybricksHub:
             # Verify the expected calls were made
             hub.download_user_program.assert_called_once()
             hub.start_user_program.assert_called_once()
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "legacy", [0, HubCapabilityFlag.USER_PROG_MULTI_FILE_MPY6_1_NATIVE]
+)
+async def test_download_native_v63(tmp_path, legacy):
+    source = tmp_path / "program.py"
+    source.write_text(
+        "import micropython\n@micropython.viper\n"
+        "def add(x: int, y: int) -> int: return x + y\nprint(add(20, 22))\n"
+    )
+    hub = PybricksHubBLE("mock_device")
+    hub.hub_kind = HubKind.TECHNIC_LARGE
+    hub.connection_state_observable.on_next(ConnectionState.CONNECTED)
+    hub._capability_flags = (
+        HubCapabilityFlag.USER_PROG_FORMAT_MULTI_MPY_V6_3_NATIVE | legacy
+    )
+    hub.download_user_program = AsyncMock()
+    await hub.download(str(source))
+    (package,) = hub.download_user_program.call_args.args
+    name, _, mpy = package[4:].partition(b"\0")
+    assert name == b"__main__"
+    assert len(mpy) == int.from_bytes(package[:4], "little")
+    assert mpy[:4] == bytes([ord("M"), 6, (5 << 2) | 3, 31])

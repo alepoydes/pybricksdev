@@ -53,14 +53,17 @@ async def test_compile_file(abi: int):
         assert int_bits == 31
 
 
+@pytest.mark.parametrize("abi", [4, (6, 9), (5, 1)])
 @pytest.mark.asyncio
-async def test_compile_file_invalid_abi():
+async def test_compile_file_invalid_abi(abi):
     with TemporaryDirectory() as temp_dir:
         with open(os.path.join(temp_dir, "test.py"), "w", encoding="utf-8") as f:
             f.write("print('test')")
 
         with pytest.raises(ValueError, match="mpy_version must be 5 or 6"):
-            await compile_file(os.path.dirname(f.name), os.path.basename(f.name), abi=4)
+            await compile_file(
+                os.path.dirname(f.name), os.path.basename(f.name), abi=abi
+            )
 
 
 @pytest.mark.parametrize("abi", [5, 6])
@@ -199,3 +202,65 @@ async def test_compile_multi_file(abi: int):
         check_mpy(mpy5)
         check_mpy(mpy6)
         check_mpy(mpy7)
+
+
+def unpack_modules(package):
+    modules = {}
+    while package:
+        size = int.from_bytes(package[:4], "little")
+        name, _, remainder = package[4:].partition(b"\0")
+        modules[name.decode()] = remainder[:size]
+        package = remainder[size:]
+    return modules
+
+
+@pytest.mark.asyncio
+async def test_native_v63_modules_and_imports(tmp_path):
+    program = tmp_path / "program.py"
+    program.write_text("from fast import calculate\nprint(calculate(21))\n")
+    fast = tmp_path / "fast.py"
+    fast.write_text(
+        "import micropython\nfrom constants import factor\n"
+        "@micropython.native\ndef calculate(x): return x * factor\n"
+    )
+    (tmp_path / "constants.py").write_text("factor = 2\n")
+    native = await compile_file(str(tmp_path), fast.name, (6, 3), ["-march=armv7m"])
+    assert native[:4] == bytes([ord("M"), 6, (5 << 2) | 3, 31])
+    fast.unlink()
+    (tmp_path / "fast.mpy").write_bytes(native)
+    modules = unpack_modules(await compile_multi_file(str(program), (6, 3)))
+    assert set(modules) == {"__main__", "fast", "constants"}
+    assert modules["fast"] == native
+
+
+@pytest.mark.asyncio
+@pytest.mark.parametrize(
+    "header, abi, error",
+    [
+        (b"M", (6, 3), "invalid .mpy header"),
+        (bytes([ord("M"), 5, 0, 31]), (6, 3), "major version"),
+        (bytes([ord("M"), 6, 21, 31]), (6, 3), "minor version"),
+        (bytes([ord("M"), 6, 23, 31]), 6, "no native ABI"),
+    ],
+)
+async def test_reject_incompatible_precompiled_module(tmp_path, header, abi, error):
+    program = tmp_path / "program.py"
+    program.write_text("import incompatible\n")
+    (tmp_path / "incompatible.mpy").write_bytes(header)
+    with pytest.raises(ValueError, match=error):
+        await compile_multi_file(str(program), abi)
+
+
+@pytest.mark.asyncio
+async def test_precompiled_bytecode_package(tmp_path):
+    program = tmp_path / "program.py"
+    program.write_text("import package\nprint(package.value)\n")
+    (tmp_path / "package").mkdir()
+    init = tmp_path / "package/__init__.py"
+    init.write_text("value = 42\n")
+    bytecode = await compile_file(str(tmp_path), "package/__init__.py", 6)
+    init.unlink()
+    init.with_suffix(".mpy").write_bytes(bytecode)
+    modules = unpack_modules(await compile_multi_file(str(program), 6))
+    assert set(modules) == {"__main__", "package"}
+    assert modules["package"] == bytecode
