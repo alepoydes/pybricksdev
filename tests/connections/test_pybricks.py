@@ -9,6 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from reactivex.subject import Subject
 
+from pybricksdev.ble.pybricks import PYBRICKS_COMMAND_EVENT_UUID, Command
 from pybricksdev.connections.pybricks import (
     ConnectionState,
     HubCapabilityFlag,
@@ -20,6 +21,36 @@ from pybricksdev.connections.pybricks import (
 
 class TestPybricksHub:
     """Tests for the PybricksHub base class functionality."""
+
+    @pytest.mark.asyncio
+    async def test_start_user_program_slot_selection(self):
+        hub = PybricksHubBLE("mock_device")
+        hub.write_gatt_char = AsyncMock()
+        hub._num_of_slots = 5
+        hub._selected_slot = 4  # May be stale; the hub owns default selection.
+
+        await hub.start_user_program(None)
+        hub.write_gatt_char.assert_awaited_with(
+            PYBRICKS_COMMAND_EVENT_UUID,
+            bytes([Command.START_USER_PROGRAM]),
+            response=True,
+        )
+
+        await hub.start_user_program(2)
+        hub.write_gatt_char.assert_awaited_with(
+            PYBRICKS_COMMAND_EVENT_UUID,
+            bytes([Command.START_USER_PROGRAM, 2]),
+            response=True,
+        )
+
+        hub._num_of_slots = 0  # Legacy firmware has no slot argument.
+        await hub.start_user_program(2)
+        hub.write_gatt_char.assert_awaited_with(
+            PYBRICKS_COMMAND_EVENT_UUID,
+            bytes([Command.START_USER_PROGRAM]),
+            response=True,
+        )
+        assert hub.write_gatt_char.await_count == 3
 
     @pytest.mark.asyncio
     async def test_download_modern_protocol(self):

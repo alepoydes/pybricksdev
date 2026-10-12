@@ -509,16 +509,13 @@ class PybricksHub:
         User program ID requires hub with Pybricks Profile >= v1.4.0.
         """
 
-        if slot is None:
-            slot = self._selected_slot
-
         # TODO: add fallback for starting REPL on older firmware
 
         await self.write_gatt_char(
             PYBRICKS_COMMAND_EVENT_UUID,
             (
                 struct.pack("<B", Command.START_USER_PROGRAM)
-                if self._num_of_slots == 0
+                if self._num_of_slots == 0 or slot is None
                 else struct.pack("<BB", Command.START_USER_PROGRAM, slot)
             ),
             response=True,
