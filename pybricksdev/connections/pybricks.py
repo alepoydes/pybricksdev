@@ -601,9 +601,9 @@ class PybricksHub:
             & HubCapabilityFlag.USER_PROG_FORMAT_MULTI_MPY_V6_3_NATIVE
         ):
             abi = (6, 3)
-            # Both Prime/Inventor MCU variants accept Thumb-2 without FPU instructions.
+            # Both Prime/Inventor MCU variants use the hard-float single-precision ABI.
             if self.hub_kind == HubKind.TECHNIC_LARGE:
-                compile_args = ["-march=armv7m"]
+                compile_args = ["-march=armv7emsp"]
 
         # Compile the script to mpy format
         mpy = await compile_multi_file(script_path, abi, compile_args)

@@ -278,4 +278,4 @@ async def test_download_native_v63(tmp_path, legacy):
     name, _, mpy = package[4:].partition(b"\0")
     assert name == b"__main__"
     assert len(mpy) == int.from_bytes(package[:4], "little")
-    assert mpy[:4] == bytes([ord("M"), 6, (5 << 2) | 3, 31])
+    assert mpy[:4] == bytes([ord("M"), 6, (7 << 2) | 3, 31])
