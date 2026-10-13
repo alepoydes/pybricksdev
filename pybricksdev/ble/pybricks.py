@@ -134,6 +134,16 @@ class Command(IntEnum):
     .. availability:: Since Pybricks protocol v1.3.0.
     """
 
+    WRITE_APP_DATA = 7
+    """Write to the user program's pre-allocated app data buffer.
+
+    Parameters:
+        offset: Buffer offset (16-bit unsigned little-endian integer).
+        payload: Bytes to overwrite starting at the offset.
+
+    .. availability:: Since Pybricks protocol v1.4.0.
+    """
+
 
 class CommandError(IntEnum):
     """
@@ -195,6 +205,12 @@ class Event(IntEnum):
     the hub.
 
     .. availability:: Since Pybricks protocol v1.3.0.
+    """
+
+    WRITE_APP_DATA = 2
+    """Opaque app data sent by the hub to the host.
+
+    .. availability:: Since Pybricks protocol v1.4.0.
     """
 
 

@@ -9,7 +9,7 @@ from unittest.mock import AsyncMock, patch
 import pytest
 from reactivex.subject import Subject
 
-from pybricksdev.ble.pybricks import PYBRICKS_COMMAND_EVENT_UUID, Command
+from pybricksdev.ble.pybricks import PYBRICKS_COMMAND_EVENT_UUID, Command, Event
 from pybricksdev.connections.pybricks import (
     ConnectionState,
     HubCapabilityFlag,
@@ -21,6 +21,49 @@ from pybricksdev.connections.pybricks import (
 
 class TestPybricksHub:
     """Tests for the PybricksHub base class functionality."""
+
+    def test_app_data_event_routing(self):
+        hub = PybricksHubBLE("mock_device")
+        app_data, stdout, status = [], [], []
+        hub.app_data_observable.subscribe(app_data.append)
+        hub.stdout_observable.subscribe(stdout.append)
+        hub.status_observable.subscribe(status.append)
+
+        hub._pybricks_service_handler(0, bytes([Event.WRITE_APP_DATA, 0, 255]))
+        hub._pybricks_service_handler(0, bytes([Event.WRITE_STDOUT]) + b"text")
+        hub._pybricks_service_handler(
+            0,
+            bytes([Event.STATUS_REPORT])
+            + int(StatusFlag.USER_PROGRAM_RUNNING).to_bytes(4, "little"),
+        )
+
+        assert app_data == [b"\x00\xff"]
+        assert stdout == [b"text"]
+        assert status[-1] == StatusFlag.USER_PROGRAM_RUNNING
+
+    @pytest.mark.asyncio
+    async def test_write_app_data_packet_and_bounds(self):
+        hub = PybricksHubBLE("mock_device")
+        hub.write_gatt_char = AsyncMock()
+
+        await hub.write_app_data(b"abc")
+        hub.write_gatt_char.assert_awaited_with(
+            PYBRICKS_COMMAND_EVENT_UUID, b"\x07\x00\x00abc", response=True
+        )
+        await hub.write_app_data(bytes(range(17)), offset=65535)
+        hub.write_gatt_char.assert_awaited_with(
+            PYBRICKS_COMMAND_EVENT_UUID,
+            b"\x07\xff\xff" + bytes(range(17)),
+            response=True,
+        )
+        assert hub.write_gatt_char.await_count == 2
+
+        for offset in (-1, 65536):
+            with pytest.raises(ValueError, match="offset"):
+                await hub.write_app_data(b"x", offset=offset)
+        with pytest.raises(ValueError, match="too big"):
+            await hub.write_app_data(bytes(range(18)))
+        assert hub.write_gatt_char.await_count == 2
 
     @pytest.mark.asyncio
     async def test_start_user_program_slot_selection(self):

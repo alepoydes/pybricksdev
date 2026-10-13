@@ -130,6 +130,7 @@ class PybricksHub:
         self.connection_state_observable = BehaviorSubject(ConnectionState.DISCONNECTED)
         self.status_observable = BehaviorSubject(StatusFlag(0))
         self._stdout_subject = Subject()
+        self._app_data_subject = Subject()
         self.nus_observable = Subject()
         self.print_output = True
         self.fw_version = None
@@ -177,6 +178,11 @@ class PybricksHub:
         Observable used to subscribe to stdout of the hub.
         """
         return self._stdout_subject
+
+    @property
+    def app_data_observable(self) -> Observable[bytes]:
+        """Observable for opaque app data events sent by the hub."""
+        return self._app_data_subject
 
     def _line_handler(self, line: bytes) -> None:
         """
@@ -282,6 +288,8 @@ class PybricksHub:
 
             if self._enable_line_handler:
                 self._handle_line_data(payload)
+        elif data[0] == Event.WRITE_APP_DATA:
+            self._app_data_subject.on_next(data[1:])
 
     def _handle_disconnect(self):
         logger.info("Disconnected!")
@@ -398,6 +406,22 @@ class PybricksHub:
                 )
 
             await self.write_gatt_char(PYBRICKS_COMMAND_EVENT_UUID, msg, True)
+
+    async def write_app_data(self, data: bytes, offset: int = 0) -> None:
+        """Overwrite app data at *offset* with one atomic command.
+
+        The hub's user program owns the buffer and interprets its contents.
+        This method does not split writes across packets.
+        """
+        if not 0 <= offset <= 0xFFFF:
+            raise ValueError("offset must be a 16-bit unsigned integer")
+        if len(data) + 3 > self._max_write_size:
+            raise ValueError(
+                f"data is too big, limited to {self._max_write_size - 3} bytes"
+            )
+
+        msg = bytes([Command.WRITE_APP_DATA]) + struct.pack("<H", offset) + data
+        await self.write_gatt_char(PYBRICKS_COMMAND_EVENT_UUID, msg, response=True)
 
     async def write_string(self, value: str) -> None:
         """
